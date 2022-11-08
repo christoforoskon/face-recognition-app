@@ -7,47 +7,12 @@ import Rank from './components/Rank/Rank';
 import FaceRecognition from './components/FaceRecognition/FaceRecognition';
 import ParticlesBg from 'particles-bg';
 import Clarifai from 'clarifai';
+import axios, * as others from 'axios';
 
 
 const app = new Clarifai.App({
   apiKey: '32efda695ffd48c299dc071f0e387f50'
 });
-
-
-const USER_ID = 'christoforosknks';
-// Your PAT (Personal Access Token) can be found in the portal under Authentification
-const PAT = '35d5795a0d8a49b3973468a1a29906a7';
-const APP_ID = 'my-first-application';
-// Change these to whatever model and image URL you want to use
-const MODEL_ID = 'color-recognition';
-const MODEL_VERSION_ID = 'dd9458324b4b45c2be1a7ba84d27cd04';
-const IMAGE_URL = 'https://image.shutterstock.com/image-photo/row-tops-heads-cats-dogs-260nw-1034939470.jpg';
-
-
-const raw = JSON.stringify({
-  "user_app_id": {
-    "user_id": USER_ID,
-    "app_id": APP_ID
-  },
-  "inputs": [
-    {
-      "data": {
-        "image": {
-          "url": IMAGE_URL
-        }
-      }
-    }
-  ]
-});
-
-const requestOptions = {
-  method: 'POST',
-  headers: {
-    'Accept': 'application/json',
-    'Authorization': 'Key ' + PAT
-  },
-  body: raw
-};
 
 class App extends React.Component {
   constructor() {
@@ -58,20 +23,54 @@ class App extends React.Component {
     }
   }
 
+  calculateFaceLocation = (data) => {
+    const clarifaiFace = data.outputs[0].data.regions[0].region_info.bounding_box;
+    const image = document.getElementById('inputimage');
+    const width = Number(image.width);
+    const height = Number(image.height);
+    // console.log(width, height);
+    return {
+      leftCol: clarifaiFace.left_col * width,
+      topRow: clarifaiFace.top_row * height,
+      rightCol: width - (clarifaiFace.right_col * width),
+      bottomRow: height - (clarifaiFace.bottom_row * height),
+    }
+  }
+
+  displayFaceBox = (box) => {
+    console.log(box);
+    this.setState({ box: box });
+  }
+
   onInputChange = (event) => {
     this.setState({ input: event.target.value });
   }
 
+  // .predict('53e1df302c079b3db8a0a36033ed2d15', this.state.input)
+  // .predict(Clarifai.FACE_DETECT_MODEL, this.state.input)
   onButtonSubmit = () => {
-    console.log('click');
 
     this.setState({ imageUrl: this.state.input });
-
-    fetch("https://api.clarifai.com/v2/models/" + MODEL_ID + "/versions/" + MODEL_VERSION_ID + "/outputs", requestOptions)
-      .then(response => response.text())
-      .then(result => console.log(result))
-      .catch(error => console.log('error', error));
+    app.models
+      .predict(
+        // HEADS UP! Sometimes the Clarifai Models can be down or not working as they are constantly getting updated.
+        // A good way to check if the model you are using is up, is to check them on the clarifai website. For example,
+        // for the Face Detect Mode: https://www.clarifai.com/models/face-detection
+        // If that isn't working, then that means you will have to wait until their servers are back up. Another solution
+        // is to use a different version of their model that works like the ones found here: https://github.com/Clarifai/clarifai-javascript/blob/master/src/index.js
+        // so you would change from:
+        // .predict(Clarifai.FACE_DETECT_MODEL, this.state.input)
+        // to:
+        // .predict('53e1df302c079b3db8a0a36033ed2d15', this.state.input)
+        Clarifai.FACE_DETECT_MODEL,
+        this.state.input)
+      .then(response => {
+        console.log('hi', response)
+        this.displayFaceBox(this.calculateFaceLocation(response))
+      })
+      .catch(err => console.log(err));
   }
+
 
   render() {
     return (
